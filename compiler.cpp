@@ -291,31 +291,107 @@ void CreatePrintfInt(Module *mod, BasicBlock *bb, Value *val) {
 // ---------------------------------------------------------------------------
 Value *ProgramAST::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
+  
+  // F->print(llvm::errs());
+
+  // // Stmts are the statements of the program
+  for (auto &Stmt : Stmts) {
+    // check if the statement is assignmnet
+    // then call the code gen statement 
+    if (Stmt->IsAssign()) {
+      Stmt->codegen(F);
+    } else {
+      // It is an expression
+      Stmt->codegen(F);
+    }
+  }
+  // Not sure, this seems fine 
   return nullptr;
 }
 
 Value *AssignStmtAST::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
-  return nullptr;
+  // Generate IR for assignment statement
+  Value *RHS = RHS->codegen(F);
+  NamedValues[Name->Name] = RHS;
+  
+  return RHS;
 }
 
 Value *ExprStmtAST::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
+  // Generate IR for expressions
   return nullptr;
 }
 
 Value *NumberASTNode::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
+  //Generate IR for number (create a constant integer)
   return nullptr;
 }
 
 Value *VariableASTNode::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
+  //Generate IR for variable reference
   return nullptr;
 }
 
 Value *CallASTNode::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
+  // Generate IR for a function call
+  
+
+  // check if the callee is mkArray
+  if (Callee == "mkArray") {
+    // mkArray(# of dimensions, <dimension lengths>, <values>)
+    // Generate IR for mkArray
+
+    // use the MiniAPLArrayType
+    // F is empty (LLVM function)
+    // Args.at(0)->codegen(F)
+
+    MiniAPLArrayType type = TypeTable[this];
+    int num_dimensions = type.dimension();
+    
+    // grab the length of each dimension
+    std::vector<int> dimension_lengths;
+    for (int i = 0; i < num_dimensions; i++) {
+      dimension_lengths.push_back(type.length(i));
+    }
+
+    // grab the values of the arguments 
+    std::vector<Value *> values;
+    for (int i = num_dimensions + 1; i < Args.size(); i++) {
+      values.push_back(Args.at(i)->codegen(F));
+    }
+
+    // create the alloca, malloc in meory
+    Value *array = Builder.CreateAlloca(ArrayType::get(IntegerType::get(*TheContext, 32), dimension_lengths));
+
+    // store the values into the array
+    for (int i = 0; i < values.size(); i++) {
+      Builder.CreateStore(values.at(i), array + Builder.CreateConstInBoundsGEP(array, {Builder.getInt32(0), Builder.getInt32(i)}));
+    }
+
+    // might need to store other stuff
+    // to help index values
+
+    // llvm store takes addr space, takes the value
+    // return the array
+    return array;
+    
+  } else if (Callee == "neg") {
+    // neg(<array>)
+    // Generate IR for neg
+    return nullptr;
+  } else if (Callee == "exp") {
+    // exp(<array>, power)
+    // Generate IR for exp
+    return nullptr;
+  }
+
+
+  // builder.CreateAdd(Args.at(0)->codegen(F), Args.at(1)->codegen(F));
   return nullptr;
 }
 
