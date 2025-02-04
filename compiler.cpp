@@ -445,15 +445,63 @@ Value *CallASTNode::codegen(Function *F) {
 
     return result;
   } else if (Callee == "add") {
-    // add(<array>, <array>)
+    // create IR for add(<array>, <array>)
     
+    MiniAPLArrayType type = TypeTable[this];
+    int num_elements = type.Cardinality();
+    ArrayType *array_type = ArrayType::get(intTy(32), num_elements);
 
-    // Generate IR for add
-    return nullptr;
+    // create the alloca, malloc in meory
+    Value *result = Builder.CreateAlloca(array_type);
+
+    // get pointer of the 2 input arrays
+    Value *add_array1 = Args.at(0)->codegen(F);
+    Value *add_array2 = Args.at(1)->codegen(F);
+
+    // go through and add them together
+    for (int i = 0; i < num_elements; i++) {
+      Value *Ptr = Builder.CreateInBoundsGEP(array_type, result, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element_result");
+      
+      Value *add_array1_element = Builder.CreateInBoundsGEP(array_type, add_array1, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element_1");
+      Value *add_array2_element = Builder.CreateInBoundsGEP(array_type, add_array2, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element_2");
+     
+      Value *val_1 = Builder.CreateLoad(intTy(32), add_array1_element, "value_1");
+      Value *val_2 = Builder.CreateLoad(intTy(32), add_array2_element, "value_2");
+     
+      Value *add_element = Builder.CreateAdd(val_1, val_2, "add_element");
+      Builder.CreateStore(add_element, Ptr);
+    }
+
+    return result;
   } else if (Callee == "sub") {
-    // sub(<array>, <array>)
-    // Generate IR for sub
-    return nullptr;
+    // create IR for sub(<array>, <array>)
+    
+    MiniAPLArrayType type = TypeTable[this];
+    int num_elements = type.Cardinality();
+    ArrayType *array_type = ArrayType::get(intTy(32), num_elements);
+
+    // create the alloca, malloc in meory
+    Value *result = Builder.CreateAlloca(array_type);
+
+    // get pointer of the 2 input arrays
+    Value *sub_array1 = Args.at(0)->codegen(F);
+    Value *sub_array2 = Args.at(1)->codegen(F);
+
+    // go through and add them together
+    for (int i = 0; i < num_elements; i++) {
+      Value *Ptr = Builder.CreateInBoundsGEP(array_type, result, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element_result");
+      
+      Value *sub_array1_element = Builder.CreateInBoundsGEP(array_type, sub_array1, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element_1");
+      Value *sub_array2_element = Builder.CreateInBoundsGEP(array_type, sub_array2, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element_2");
+     
+      Value *val_1 = Builder.CreateLoad(intTy(32), sub_array1_element, "value_1");
+      Value *val_2 = Builder.CreateLoad(intTy(32), sub_array2_element, "value_2");
+     
+      Value *sub_element = Builder.CreateSub(val_1, val_2, "sub_element");
+      Builder.CreateStore(sub_element, Ptr);
+    }
+
+    return result;
   } else if (Callee == "reduce") {
     // reduce(<array>)
     // Generate IR for reduce
