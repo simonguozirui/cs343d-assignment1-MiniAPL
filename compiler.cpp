@@ -503,13 +503,41 @@ Value *CallASTNode::codegen(Function *F) {
 
     return result;
   } else if (Callee == "reduce") {
-    // reduce(<array>)
-    // Generate IR for reduce
-    return nullptr;
+    //  Generate IR for reduce(<array>)
+    MiniAPLArrayType type = TypeTable[this]; // this is refering to the output type
+
+    // get input type to accurately compute indexes
+    MiniAPLArrayType input_type = TypeTable[Args.at(0).get()];
+    int num_elements = input_type.Cardinality();
+    int num_dimensions = input_type.dimension();
+    int inner_dimension = input_type.length(num_dimensions - 1); // innermost dimension
+
+    ArrayType *input_array_type = ArrayType::get(intTy(32), num_elements);
+    Value *input_array = Args.at(0)->codegen(F);
+
+    int output_num_elements = num_elements / inner_dimension;
+    ArrayType *output_array_type = ArrayType::get(intTy(32), output_num_elements);
+    Value *result = Builder.CreateAlloca(output_array_type);
+    // outer loop
+    for (int i = 0; i < num_elements; i=i+inner_dimension) {
+        // inner loop
+        Value *sum_value = Builder.getInt32(0); // inner dimension sum
+
+        for (int j = 0; j < inner_dimension; j++) {
+          Value *input_ptr = Builder.CreateInBoundsGEP(input_array_type, input_array, {Builder.getInt32(0), Builder.getInt32(i+j)}, "input_array_element");
+          Value *input_element = Builder.CreateLoad(intTy(32), input_ptr, "input_element");
+          sum_value = Builder.CreateAdd(sum_value, input_element, "sum_element");
+        }
+        int output_index = i / inner_dimension; 
+        Value *result_ptr = Builder.CreateInBoundsGEP(output_array_type, result, {Builder.getInt32(0), Builder.getInt32(output_index)}, "output_array_element");
+        Builder.CreateStore(sum_value, result_ptr);
+    }
+
+    return result;
   }
 
-  // builder.CreateAdd(Args.at(0)->codegen(F), Args.at(1)->codegen(F));
   return nullptr;
+
 }
 
 // ---------------------------------------------------------------------------
