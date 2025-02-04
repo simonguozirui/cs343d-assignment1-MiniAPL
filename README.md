@@ -1,4 +1,4 @@
-# MiniAPL
+# MiniAPL (Simon Guo submission, simonguo@stanford.edu)
 
 In this assignment you will implement a tiny language for dense matrix operations called MiniAPL. MiniAPL scripts consist of expressions that build dense tensors (N-dimensional arrays) and print them to the terminal. MiniAPL script files end with `.mapl`.
 
