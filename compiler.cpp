@@ -318,27 +318,52 @@ Value *AssignStmtAST::codegen(Function *F) {
   return RHS_value;
 }
 
+
+// helper to print the brackets
+void print_brackets(std::vector<int> shapes, std::vector<Value *> values, int num_elements) { 
+  for (int i = 0; i < num_elements; i++) {
+    CreatePrintfInt(TheModule.get(), Builder.GetInsertBlock(), values.at(i));
+    if (i != num_elements - 1) {
+      CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), ",");
+    }
+  }
+}
+
 Value *ExprStmtAST::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
   // Generate IR for expressions
 
   Value* result = Val->codegen(F);
   ArrayType *array_type = ArrayType::get(intTy(32), TypeTable[Val.get()].Cardinality());
-  
-  for (int i = 0; i < TypeTable[Val.get()].Cardinality(); i++) {
-    Value *Ptr = Builder.CreateInBoundsGEP(array_type, result, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element");
+  array_type->print(llvm::errs());
+  result->print(llvm::errs());  
 
-    Value* curr_element = Builder.CreateLoad(intTy(32), Ptr, "element");
-    CreatePrintfInt(TheModule.get(), Builder.GetInsertBlock(), curr_element);
+
+  std::vector<int> shapes;
+  for (int i = 0; i < TypeTable[Val.get()].dimension(); i++) {
+    int curr_length = TypeTable[Val.get()].length(i);
+    shapes.push_back(curr_length);
   }
+  
+
+  std::vector<Value *> values;
+  int num_elements = TypeTable[Val.get()].Cardinality();
+
+  // currently let's just print the numbers
+  for (int i = 0; i < num_elements; i++) {
+    Value *Ptr = Builder.CreateInBoundsGEP(array_type, result, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element");
+    Value* curr_element = Builder.CreateLoad(intTy(32), Ptr, "element");
+    values.push_back(curr_element);
+  }
+
+  print_brackets(shapes, values, num_elements);
   return nullptr;
 }
 
 Value *NumberASTNode::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
+  // Create a constant integer from the value
   return intConst(32, Val);
-  //Generate IR for number (create a constant integer)
-  // return nullptr;
 }
 
 Value *VariableASTNode::codegen(Function *F) {
@@ -346,19 +371,15 @@ Value *VariableASTNode::codegen(Function *F) {
   // Fetch the variable from the variable table 
   Value *variable = NamedValues[Name];
   if (!variable) {
-    LogError("Unknown variable name: " + Name);
+    LogError("Unknown variable: " + Name);
   }
   return variable;
 }
 
 Value *CallASTNode::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
-  // Generate IR for a function call
-  
-
-  // Generate IR for mkArray, 
-  // mkArray(# of dimensions, <dimension lengths>, <values>)
   if (Callee == "mkArray") {
+    // mkArray(# of dimensions, <dimension lengths>, <values>)
     // grab the current miniAPL array type and get the number of dimensions
     MiniAPLArrayType type = TypeTable[this];
     int num_dimensions = type.dimension();
@@ -367,7 +388,6 @@ Value *CallASTNode::codegen(Function *F) {
     ArrayType *array_type = ArrayType::get(intTy(32), num_elements);
     // create the alloca, malloc in meory
     Value *array = Builder.CreateAlloca(array_type);
-
 
     // grab the values of the arguments 
     std::vector<Value *> values;
@@ -382,20 +402,63 @@ Value *CallASTNode::codegen(Function *F) {
       Value *Ptr = Builder.CreateInBoundsGEP(array_type, array, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element");
       Builder.CreateStore(values.at(i), Ptr);
     }
-
     // might need to store other stuff
     // to help index values
     return array;    
   } else if (Callee == "neg") {
-    // neg(<array>)
-    // Generate IR for neg
-    return nullptr;
+    // Generate IR for neg: neg(<array>)
+
+    MiniAPLArrayType type = TypeTable[this];
+    int num_elements = type.Cardinality();
+    ArrayType *array_type = ArrayType::get(intTy(32), num_elements);
+
+    Value *result = Args.at(0)->codegen(F);
+    // go through and negate
+    for (int i = 0; i < num_elements; i++) {
+      Value *Ptr = Builder.CreateInBoundsGEP(array_type, result, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element");
+      Value *curr_element = Builder.CreateLoad(intTy(32), Ptr, "element");
+      Value *neg_element = Builder.CreateNeg(curr_element, "neg_element");
+      Builder.CreateStore(neg_element, Ptr);
+    }
+
+    return result;
   } else if (Callee == "exp") {
-    // exp(<array>, power)
-    // Generate IR for exp
+    // Generate IR for exp exp(<array>, <power>)
+
+    MiniAPLArrayType type = TypeTable[this];
+    int num_elements = type.Cardinality();
+    ArrayType *array_type = ArrayType::get(intTy(32), num_elements);
+
+    Value *result = Args.at(0)->codegen(F);
+    int power = static_cast<ConstantInt *>(Args.at(1)->codegen(F))->getSExtValue();
+    // go through the loop and apply the power
+    for (int i = 0; i < num_elements; i++) {
+      Value *Ptr = Builder.CreateInBoundsGEP(array_type, result, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element");
+      Value *curr_element = Builder.CreateLoad(intTy(32), Ptr, "element");
+      
+      Value *exp_value = Builder.getInt32(1); // start at 1
+      for (int j = 0; j < power; j++) {
+        exp_value = Builder.CreateMul(exp_value, curr_element, "mul_element");
+      }
+      Builder.CreateStore(exp_value, Ptr);
+    }
+
+    return result;
+  } else if (Callee == "add") {
+    // add(<array>, <array>)
+    
+
+    // Generate IR for add
+    return nullptr;
+  } else if (Callee == "sub") {
+    // sub(<array>, <array>)
+    // Generate IR for sub
+    return nullptr;
+  } else if (Callee == "reduce") {
+    // reduce(<array>)
+    // Generate IR for reduce
     return nullptr;
   }
-
 
   // builder.CreateAdd(Args.at(0)->codegen(F), Args.at(1)->codegen(F));
   return nullptr;
