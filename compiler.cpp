@@ -312,28 +312,43 @@ Value *ProgramAST::codegen(Function *F) {
 Value *AssignStmtAST::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
   // Generate IR for assignment statement
-  Value *RHS = RHS->codegen(F);
-  NamedValues[Name->Name] = RHS;
+  Value *RHS_value = RHS->codegen(F);
+  NamedValues[Name->Name] = RHS_value;
   
-  return RHS;
+  return RHS_value;
 }
 
 Value *ExprStmtAST::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
   // Generate IR for expressions
+
+  Value* result = Val->codegen(F);
+  ArrayType *array_type = ArrayType::get(intTy(32), TypeTable[Val.get()].Cardinality());
+  
+  for (int i = 0; i < TypeTable[Val.get()].Cardinality(); i++) {
+    Value *Ptr = Builder.CreateInBoundsGEP(array_type, result, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element");
+
+    Value* curr_element = Builder.CreateLoad(intTy(32), Ptr, "element");
+    CreatePrintfInt(TheModule.get(), Builder.GetInsertBlock(), curr_element);
+  }
   return nullptr;
 }
 
 Value *NumberASTNode::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
+  return intConst(32, Val);
   //Generate IR for number (create a constant integer)
-  return nullptr;
+  // return nullptr;
 }
 
 Value *VariableASTNode::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
-  //Generate IR for variable reference
-  return nullptr;
+  // Fetch the variable from the variable table 
+  Value *variable = NamedValues[Name];
+  if (!variable) {
+    LogError("Unknown variable name: " + Name);
+  }
+  return variable;
 }
 
 Value *CallASTNode::codegen(Function *F) {
@@ -341,45 +356,36 @@ Value *CallASTNode::codegen(Function *F) {
   // Generate IR for a function call
   
 
-  // check if the callee is mkArray
+  // Generate IR for mkArray, 
+  // mkArray(# of dimensions, <dimension lengths>, <values>)
   if (Callee == "mkArray") {
-    // mkArray(# of dimensions, <dimension lengths>, <values>)
-    // Generate IR for mkArray
-
-    // use the MiniAPLArrayType
-    // F is empty (LLVM function)
-    // Args.at(0)->codegen(F)
-
+    // grab the current miniAPL array type and get the number of dimensions
     MiniAPLArrayType type = TypeTable[this];
     int num_dimensions = type.dimension();
-    
-    // grab the length of each dimension
-    std::vector<int> dimension_lengths;
-    for (int i = 0; i < num_dimensions; i++) {
-      dimension_lengths.push_back(type.length(i));
-    }
+    int num_elements = type.Cardinality();
+
+    ArrayType *array_type = ArrayType::get(intTy(32), num_elements);
+    // create the alloca, malloc in meory
+    Value *array = Builder.CreateAlloca(array_type);
+
 
     // grab the values of the arguments 
     std::vector<Value *> values;
+    // start from num_dimensions + 1 as first arg is the number of dimensions
     for (int i = num_dimensions + 1; i < Args.size(); i++) {
       values.push_back(Args.at(i)->codegen(F));
     }
 
-    // create the alloca, malloc in meory
-    Value *array = Builder.CreateAlloca(ArrayType::get(IntegerType::get(*TheContext, 32), dimension_lengths));
-
     // store the values into the array
     for (int i = 0; i < values.size(); i++) {
-      Builder.CreateStore(values.at(i), array + Builder.CreateConstInBoundsGEP(array, {Builder.getInt32(0), Builder.getInt32(i)}));
+      // calculate address of the element
+      Value *Ptr = Builder.CreateInBoundsGEP(array_type, array, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element");
+      Builder.CreateStore(values.at(i), Ptr);
     }
 
     // might need to store other stuff
     // to help index values
-
-    // llvm store takes addr space, takes the value
-    // return the array
-    return array;
-    
+    return array;    
   } else if (Callee == "neg") {
     // neg(<array>)
     // Generate IR for neg
