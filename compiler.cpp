@@ -320,14 +320,30 @@ Value *AssignStmtAST::codegen(Function *F) {
 
 
 // helper to print the brackets
-void print_brackets(std::vector<int> shapes, std::vector<Value *> values, int num_elements) { 
-  for (int i = 0; i < num_elements; i++) {
-    CreatePrintfInt(TheModule.get(), Builder.GetInsertBlock(), values.at(i));
-    if (i != num_elements - 1) {
-      CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), ",");
-    }
+void print_brackets(std::vector<int> shapes, std::vector<Value *> values, int offset, int num_elements) {
+  // base case
+  if (shapes.size() == 0) {
+    CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), "[");
+
+    CreatePrintfInt(TheModule.get(), Builder.GetInsertBlock(), values[offset]);
+    CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), "]");
+
+    return;
   }
+
+  // start [
+  CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), "[");
+  
+  int outer_dim = shapes[0];
+
+  for (int i = 0; i < outer_dim; i++) {
+    std::vector<int> next_shapes(shapes.begin() + 1, shapes.end());
+    print_brackets(next_shapes, values, offset + i * num_elements / outer_dim, num_elements / outer_dim);
+  }
+
+  CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), "]");
 }
+
 
 Value *ExprStmtAST::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
@@ -353,10 +369,15 @@ Value *ExprStmtAST::codegen(Function *F) {
   for (int i = 0; i < num_elements; i++) {
     Value *Ptr = Builder.CreateInBoundsGEP(array_type, result, {Builder.getInt32(0), Builder.getInt32(i)}, "array_element");
     Value* curr_element = Builder.CreateLoad(intTy(32), Ptr, "element");
+    // debug
+    // CreatePrintfInt(TheModule.get(), Builder.GetInsertBlock(), curr_element);
+    // CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), ",");
     values.push_back(curr_element);
   }
 
-  print_brackets(shapes, values, num_elements);
+  print_brackets(shapes, values, 0, num_elements);
+  CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), "\n");
+
   return nullptr;
 }
 
