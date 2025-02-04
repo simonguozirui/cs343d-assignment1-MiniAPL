@@ -291,10 +291,7 @@ void CreatePrintfInt(Module *mod, BasicBlock *bb, Value *val) {
 // ---------------------------------------------------------------------------
 Value *ProgramAST::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
-  
-  // F->print(llvm::errs());
-
-  // // Stmts are the statements of the program
+  // Stmts are the statements of the program
   for (auto &Stmt : Stmts) {
     // check if the statement is assignmnet
     // then call the code gen statement 
@@ -305,7 +302,7 @@ Value *ProgramAST::codegen(Function *F) {
       Stmt->codegen(F);
     }
   }
-  // Not sure, this seems fine 
+  // TBH the if statement is not needed, but I left it in for clarity
   return nullptr;
 }
 
@@ -319,7 +316,7 @@ Value *AssignStmtAST::codegen(Function *F) {
 }
 
 
-// helper to print the brackets
+// helper to print the brackets recursively
 void print_brackets(std::vector<int> shapes, std::vector<Value *> values, int offset, int num_elements) {
   // base case
   if (shapes.size() == 0) {
@@ -341,18 +338,17 @@ void print_brackets(std::vector<int> shapes, std::vector<Value *> values, int of
     print_brackets(next_shapes, values, offset + i * num_elements / outer_dim, num_elements / outer_dim);
   }
 
+  // end ] 
   CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), "]");
 }
 
 
 Value *ExprStmtAST::codegen(Function *F) {
   // STUDENTS: FILL IN THIS FUNCTION
-  // Generate IR for expressions
+  // Generate IR for expressions (mostly for the array)
 
   Value* result = Val->codegen(F);
   ArrayType *array_type = ArrayType::get(intTy(32), TypeTable[Val.get()].Cardinality());
-  array_type->print(llvm::errs());
-  result->print(llvm::errs());  
 
 
   std::vector<int> shapes;
@@ -361,7 +357,6 @@ Value *ExprStmtAST::codegen(Function *F) {
     shapes.push_back(curr_length);
   }
   
-
   std::vector<Value *> values;
   int num_elements = TypeTable[Val.get()].Cardinality();
 
@@ -374,7 +369,7 @@ Value *ExprStmtAST::codegen(Function *F) {
     // CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), ",");
     values.push_back(curr_element);
   }
-
+  // call and print with helper function
   print_brackets(shapes, values, 0, num_elements);
   CreatePrintfStr(TheModule.get(), Builder.GetInsertBlock(), "\n");
 
